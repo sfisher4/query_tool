@@ -1,5 +1,5 @@
 
-text ="0 0 1 1 1 1 0 1 1 1 1 0 0 0 0 1 1 1 1 1 1 0 1 1 0 0 1 1 1 1 1 0 0 1 1 0 1 0 0 0"
+input_example ="0 0 1 1 1 1 0 1 1 1 1 0 0 0 0 1 1 1 1 1 1 0 1 1 0 0 1 1 1 1 1 0 0 1 1 0 1 0 0 0"
 
 
 ui <- fluidPage(
@@ -15,57 +15,36 @@ ui <- fluidPage(
                      DT::dataTableOutput(outputId = "table")
                    ),
                    fluidRow(
-                     column(3, selectInput(inputId = "view_type_in",
+                     column(12, selectInput(inputId = "view_type_in",
                                            label = "View: ",
-                                           choices = c("By Strain" = "strain", "Aggregate" = "aggregate"))),
-                     column(8, uiOutput("column_display_ui")
-                     )
+                                           choices = c("By Strain" = "strain", "Aggregate" = "aggregate")))
                    ),
                    fluidRow(
-                     uiOutput("agg_by")
+                     column(6, uiOutput("column_display_ui")),
+                     conditionalPanel(condition = "input.view_type_in == 'aggregate'",
+                      column(6, uiOutput("agg_by"))
+                     )
                    )
                  )
         ),
-        tabPanel("Pattern Match",
-                 headerPanel("Pattern Match")
-        ),
-        tabPanel("Metadata",
-                 headerPanel("Metadata")
-        ),
-        tabPanel("Individual CGF Type",
-                 headerPanel("Bar Graph of Individual CGF Type"),
-                 fluidRow(
-                   column(3, selectInput(inputId = "fill_chosen",
-                                         label = "Fill Value:",
-                                         choices = c("typing.lab", "sample.origin", "sample.type", "source.general",
-                                                     "source.specific_1", "province"),
-                                         selected = "typing.lab"))
-                 ),
-                 fluidRow(
-                   plotOutput(outputId = "cgftypes_plot")
-                 )
-        ),
-        tabPanel("Aggregate CGFTypes",
-                 fluidRow(
-                   headerPanel("Bar Graph of Aggregated CGFTypes"),
-                   column(3, selectInput(inputId = "x_axis",
-                                         label = "X-axis:",
-                                         choices = c("typing.lab", "sample.origin", "sample.type", "source.general",
-                                                     "source.specific_1", "province"),
-                                         selected = "typing.lab"))
-                 ),
-                 fluidRow(
-                   plotOutput(outputId = "cgftype_plot")
-                 )
-        ),
-        tabPanel("Proportion of Sources",
-                 titlePanel("Proportion and Frequency of Sources vs CGF Type"),
+        # tabPanel("Individual CGF Type",
+        #          headerPanel("Bar Graph of Individual CGF Type"),
+        #          fluidRow(
+        #            column(12, 
+        #            uiOutput("fill_value_ui"))
+        #          ),
+        #          fluidRow(
+        #            plotOutput(outputId = "cgftypes_plot")
+        #          )
+        # ),
+        tabPanel("General Distributions",
+                 # titlePanel("General Distributions"),
                  fluidRow(
                    selectInput(inputId = "graph_type",
                                label = "Choose Type of Graph to Display:",
                                choices = c("Frequency of isolates shown using bar chart",
                                            "Frequency of isolates shown as width of bars"),
-                               selected = "")
+                               selected = "Frequency of isolates shown as width of bars")
                  ),
                  
                  conditionalPanel(condition =  "input.graph_type == 'Frequency of isolates shown using bar chart'",
@@ -77,12 +56,15 @@ ui <- fluidPage(
                  )
                  
         ),
-        tabPanel("Risk Assessment",
-                 riskogramUI("riskogram")
-         
+        tabPanel("Aggregate View",
+                 aggViewUI("agg_view")
         ),
-       tabPanel("Stackogram with Attribute Estimation",
-                attrEstStackogramUI("attr_est"))
-     )
+       tabPanel("Source Attribution",
+                attrEstStackogramUI("attr_est")
+       ),
+       tabPanel("Risk Assessment",
+                riskogramUI("riskogram")
+       )
+      )
    )
 )
