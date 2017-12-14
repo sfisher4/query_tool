@@ -2,6 +2,8 @@
 #ASK:
 # Currently my rank is integer based and doesn't have '.5' if there is >1 with that particular # of isolates. Still correctly ranks them though
 
+# options(shiny.maxRequestSize = 10*1024^2)
+
 filter_cgftype <- function(db, cgftype) {
   temp <- db %>%
     filter(cgftype %in% db.cgf_type)

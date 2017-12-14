@@ -10,10 +10,14 @@ barChartStackogramUI <- function(id) {
       column(6, uiOutput(ns("cluster_var")))
     ),
     fluidRow(
-      plotOutput(ns("prop_graph"))
+      # div(style = 'width:600px; overflow-x:scroll',
+        plotOutput(ns("prop_graph"))
+      # )
     ),
     fluidRow(
-      plotOutput(ns("bar_graph"))
+      div(style = 'width:600px; overflow-x:scroll',
+        plotOutput(ns("bar_graph"))
+      )
     ),
     fluidRow(
       column(4,
@@ -32,6 +36,9 @@ barChartStackogramUI <- function(id) {
                           label = "Choose Clustering Method: ",
                           choices = c("ward.D", "ward.D2", "single", "complete", "average"),
                           selected = "average"))
+   ),
+   fluidRow(
+     DT::dataTableOutput(outputId = ns("data_table"))
    ),
    fluidRow(
      h4("Choose bar colours: "),
@@ -186,6 +193,30 @@ barChartStackogram <- function(input, output, session, data_for_plots, data_inpu
       scale_fill_manual(values = CPCOLS(), drop = FALSE) +
       scale_x_discrete(limits = re_order()$cgf.type) +
       scale_y_continuous(trans = re_scale())
+  })
+  
+  output$data_table <- DT::renderDataTable({
+    data_with_total <- data_for_plots() %>% group_by(cgf.type) %>% summarise(total = n())
+    data_for_table <- merge(data_with_total, re_order(), all.x=TRUE, all.y=TRUE)
+    
+    if (nrow(re_order()) == 1) {
+      return(DT::datatable(re_order(), options = list(scrollX = TRUE)))
+    }
+    
+    dataset_full <- data_for_table
+    
+    dataset_with_perc <- as.data.frame(apply(dataset_full[, -c(which(colnames(dataset_full) == "cgf.type"),
+                                                               which(colnames(dataset_full) == "total"))], c(1,2), function(x) round(x * 100, digits = 4)))
+    colnames(dataset_with_perc) <- paste(colnames(dataset_with_perc), "%")
+    dataset_to_display <- cbind(as.data.frame(dataset_full[, c("cgf.type", "total")]), dataset_with_perc)
+    dataset_to_display <- dataset_to_display[!duplicated(dataset_to_display), ]
+    dataset_to_display[(nrow(dataset_to_display) + 1), which(unlist(lapply(dataset_to_display, is.numeric)))] <-
+      round((colSums(dataset_to_display[ , which(unlist(lapply(dataset_to_display, is.numeric)))], na.rm=TRUE))/nrow(dataset_to_display), digits = 4)
+    dataset_to_display[nrow(dataset_to_display), "cgf.type"] = "ALL"
+    dataset_to_display[nrow(dataset_to_display), ] %>% mutate()
+    dataset_to_display[nrow(dataset_to_display), "total"] <- sum(dataset_to_display[-nrow(dataset_to_display), ]$total)
+    
+    DT::datatable(dataset_to_display, options = list(scrollX = TRUE))
   })
   
   # callModule(propBarWidth, "attr_est_wide_graph", data_for_plots)

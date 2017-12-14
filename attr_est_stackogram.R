@@ -1,11 +1,11 @@
 require(splitstackshape)
 
+options(shiny.maxRequestSize = 10*1024^2)
 
 attrEstStackogramUI <- function(id) {
   ns <- NS(id)
   
-  tagList(titlePanel("Stackogram with Attributes Estimated"),
-          fluidRow(
+  tagList(fluidRow(
             plotOutput(ns("freq_width_plot"))
           ),
           fluidRow(
@@ -47,6 +47,10 @@ attrEstStackogramUI <- function(id) {
           ),
           fluidRow(
             DT::dataTableOutput(outputId = ns("all_data_table"))
+          ),
+          fluidRow(
+            h4("Choose bar colours: "),
+            uiOutput(ns("bar_colour_changes"))
           )
            # fluidRow(
            #   selectInput(inputId = ns("graph_type"),
@@ -104,7 +108,8 @@ estimate_attr <- function(df_to_estimate, p_sim, min_isol, wide_df) {
   est_data <- data.frame(matrix(unlist(lo_col_sums), nrow = nrow(tester), byrow=T), stringsAsFactors = FALSE)
   est_data[is.na(est_data)] <- 0
   colnames(est_data) <- col_names
-  est_data <- est_data %>% mutate(cgf.type = tester$cgf.type, Pattern = tester$Pattern, total_no_hum = tester$total_no_hum, total_with_hum = tester$total_with_hum, new_total = tester$new_total, perc_sim = tester$perc_sim)
+  est_data <- est_data %>%
+    mutate(cgf.type = tester$cgf.type, Pattern = tester$Pattern, total_no_hum = tester$total_no_hum, total_with_hum = tester$total_with_hum, new_total = tester$new_total, perc_sim = tester$perc_sim)
   
   # already_good_data <- wide_df %>% filter(total > min_isol)
   # all_data <- merge(already_good_data, est_data, all.x=TRUE, all.y=TRUE)
@@ -136,10 +141,13 @@ attrEstStackogram <- function(input, output, session, data_for_plots, data_input
     wide_df <- wide_df %>% mutate(total_no_hum = rowSums(wide_df[, -c(which(colnames(wide_df) == "cgf.type"), 
                                                                       which(colnames(wide_df) == "total_with_hum"),
                                                                       which(colnames(wide_df) == "Pattern")), drop=FALSE])) #,which(colnames(wide_df) == "old_total")
+    # wide_df <- wide_df %>% filter(total_with_hum != total_no_hum | total_with_hum == 0)
     print('wide df')
     print(wide_df)
     wide_df
   })
+  
+  
   
   #FOR ESTIMATED
   wide_data_with_estimates <- reactive({
@@ -166,10 +174,10 @@ attrEstStackogram <- function(input, output, session, data_for_plots, data_input
     if (!is.null(re_db_in_for_est())) {
       print('data to estimate!!!')
       print(re_db_in_for_est())
-      data_to_est <- re_db_in_for_est() %>% filter(total_no_hum <= re_min_isol())
+      data_to_est <- re_db_in_for_est() %>% filter(total_no_hum <= re_min_isol()) %>% filter(total_with_hum != total_no_hum | total_with_hum == 0)
     }
     else {
-      data_to_est <- re_data_before_estimates() %>% filter(total_no_hum <= re_min_isol())
+      data_to_est <- re_data_before_estimates() %>% filter(total_no_hum <= re_min_isol(), total_with_hum != total_no_hum | total_with_hum == 0)
     }
     
     print('!!!data_to_est')
@@ -226,10 +234,10 @@ attrEstStackogram <- function(input, output, session, data_for_plots, data_input
       print(est)
     }
       
-    non_estimated_data <- re_data_before_estimates() %>% filter(total_no_hum > re_min_isol())
+    non_estimated_data <- re_data_before_estimates() %>% filter(total_no_hum > re_min_isol()) %>% filter(total_with_hum != total_no_hum | total_with_hum == 0)
     all_data <- merge(non_estimated_data, est, all.x=TRUE, all.y =TRUE)
-    if(any(is.na(all_data$sim_used))) {
-    all_data[is.na(all_data$sim_used), ]$sim_used <- "100%"
+    if (any(is.na(all_data$sim_used))) {
+      all_data[is.na(all_data$sim_used), ]$sim_used <- "100%"
     }
     print('all data')
     print(all_data)
@@ -332,39 +340,67 @@ attrEstStackogram <- function(input, output, session, data_for_plots, data_input
     return (cast_df[order_ind, ])
   })
   
-  #FOR NON ESTIMATED PLOTTING
-  re_non_est_plot <- reactive({
-    ggplot(re_long_df(), aes(x=strain.name, y=1, width=1.0,
-                             ordered=TRUE)) +
-      geom_bar(aes(fill = factor(source.specific_1.y, levels = stack_levels())),
-               position=position_fill(), stat="identity", lwd=0.01, color="white") +
-      scale_y_continuous(labels = scales::percent) +
-      labs(x="Strain", y="Proportion of Sources", fill="Source") +
-      theme(axis.text.x = element_blank(), axis.ticks = element_blank()) +
-      scale_fill_brewer(palette = "RdYlBu", drop = FALSE) +
-      scale_x_discrete(limits = re_order()$strain.name)
+  
+  CPCOLS <- reactive({
+    options <- unique(data_inputted()[["source.specific_1"]])
+    colour_options = c('#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99','#b15928')
+    names(colour_options) <- options
+    
+    colours <- c()
+    lapply(1:length(options), function(x) {
+      colours <<- append(colours, input[[paste0("colour_picker", options[x])]])
+    })
+    colours
   })
   
-  re_est_plot <- reactive({
-    ggplot(long_data_with_estimates(), aes(x=row_num, y=1, width=1.0,
-                                           ordered=TRUE)) +
-      geom_bar(aes(fill = factor(source.specific_1, levels = stack_levels())), 
-               position=position_fill(), stat="identity", lwd=0.01, color="white") +
-      scale_y_continuous(labels = scales::percent) +
-      labs(x="Strain", y="Proportion of Sources", fill="Source") +
-      theme(axis.text.x = element_blank(), axis.ticks = element_blank()) +
-      scale_fill_brewer(palette = "RdYlBu", drop = FALSE) +
-      scale_x_discrete(limits = re_get_order()$row_num)
+  output$bar_colour_changes <- renderUI({
+    ns <- session$ns
+    
+    colour_options = c('#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99','#b15928')
+    options <- unique(data_inputted()[["source.specific_1"]])
+    if (length(options) > length(colour_options)) {
+      colour_options <- rep(colour_options, length.out = length(options))
+    }
+    
+    names(colour_options) <- options
+    
+    lapply(unique(data_inputted()[["source.specific_1"]]), function(n) {
+      colourInput(inputId = ns(paste0("colour_picker", n)),
+                  label = paste("Choose colour for: ", n),
+                  value = colour_options[n],
+                  palette = "limited",
+                  allowedCols = colour_options)}
+    )
   })
   
   
   output$freq_width_plot <- renderPlot ({
     
     if (input$do_estimation) {
-      plot(re_est_plot())
+      print('Reached here!!!')
+      est_plot <- ggplot(long_data_with_estimates(), aes(x=row_num, y=1, width=1.0,
+                                             ordered=TRUE)) +
+        geom_bar(aes(fill = factor(source.specific_1, levels = stack_levels())), 
+                 position=position_fill(), stat="identity", lwd=0.01, color="white") +
+        scale_y_continuous(labels = scales::percent) +
+        labs(x="Strain", y="Proportion of Sources", fill="Source") +
+        theme(axis.text.x = element_blank(), axis.ticks = element_blank()) +
+        scale_fill_manual(values = CPCOLS(), drop = FALSE) +
+        scale_x_discrete(limits = re_get_order()$row_num)
+      plot(est_plot)
     }
     else {
-      plot(re_non_est_plot())
+      print('Reached here!!!')
+     non_est_plot <- ggplot(long_data_with_estimates(), aes(x=row_num, y=1, width=1.0,
+                                             ordered=TRUE)) +
+        geom_bar(aes(fill = factor(source.specific_1, levels = stack_levels())), 
+                 position=position_fill(), stat="identity", lwd=0.01, color="white") +
+        scale_y_continuous(labels = scales::percent) +
+        labs(x="Strain", y="Proportion of Sources", fill="Source") +
+        theme(axis.text.x = element_blank(), axis.ticks = element_blank()) +
+        scale_fill_manual(values = CPCOLS(), drop = FALSE) +
+        scale_x_discrete(limits = re_get_order()$row_num)
+     plot(non_est_plot)
     }
     
   })
@@ -372,13 +408,22 @@ attrEstStackogram <- function(input, output, session, data_for_plots, data_input
   output$all_data_table <- DT::renderDataTable({
     if (input$do_estimation) {
       all_data <- wide_data_with_estimates() %>%
-        mutate("Columns used for Estimation: " = sapply(perc_sim, function(x) { if (is.na(x)) {return("NA")} else {re_data_before_estimates()[x,"cgf.type"]}}),
+        mutate("Columns used for Estimation: " = sapply(perc_sim, function(x) { if (any(is.na(x))) {return("NA")} else {re_data_before_estimates()[x,"cgf.type"]}}),
                "% Similarity Used:" = sim_used,
                "Total Strains with Human" = total_with_hum,
                "Total Strains without Human" = total_no_hum,
                "Total Strains in Estimation" = new_total,
                "Fingerprint" = Pattern) %>%
         select(-c(Pattern, perc_sim, total_with_hum, total_no_hum, sim_used, new_total))
+      
+      #TODO: FIX ALL!!!
+      all_data[(nrow(all_data) + 1), which(unlist(lapply(all_data, is.numeric)))] <-
+        round((colSums(all_data[ , which(unlist(lapply(all_data, is.numeric)))], na.rm=TRUE))) #/nrow(all_data), digits = 4)
+      all_data[nrow(all_data), "cgf.type"] = "ALL"
+      # all_data[nrow(all_data), "total"] = (all_data[nrow(all_data), "total"] * (nrow(all_data) - 1))
+      all_data[nrow(all_data), "total"] <- sum(all_data[-nrow(all_data), ]$total)
+      
+      # all_data[nrow(all_data), ] %>%
       
       DT::datatable(all_data, options = list(scrollX = TRUE))
     }
@@ -390,7 +435,7 @@ attrEstStackogram <- function(input, output, session, data_for_plots, data_input
       else {
         dataset_full <- re_order() %>% group_by(cgf.type) %>% mutate(total = n()) %>% select(-strain.name)
         dataset_with_perc <- as.data.frame(apply(dataset_full[, -c(which(colnames(dataset_full) == "cgf.type"),
-                                                                   which(colnames(dataset_full) == "total"))], c(1,2), function(x) round(x * 100)))
+                                                                   which(colnames(dataset_full) == "total"))], c(1,2), function(x) round(x * 100, digits = 4)))
         colnames(dataset_with_perc) <- paste(colnames(dataset_with_perc), "%")
         dataset_to_display <- cbind(as.data.frame(dataset_full[, c("cgf.type", "total")]), dataset_with_perc)
         dataset_to_display <- dataset_to_display[!duplicated(dataset_to_display), ]

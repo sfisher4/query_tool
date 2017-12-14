@@ -2,6 +2,8 @@ require(shiny)
 require(ggplot2)
 require(readr)
 
+options(shiny.maxRequestSize = 10*1024^2)
+
 #Module UI function
 subsetDataInput <- function(id, label = "Fingerprint:") {
   

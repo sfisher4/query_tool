@@ -188,16 +188,17 @@ propBarWidth <- function(input, output, session, data_for_plots, data_inputted) 
       mutate(total = n()) %>%
       select(-strain.name) 
     
-    dataset_with_perc <- as.data.frame(apply(dataset_full[, -c(which(colnames(dataset_full) == "cgf.type"), 
-                                                               which(colnames(dataset_full) == "total"))], c(1,2), function(x) round(x * 100)))
+    dataset_with_perc <- as.data.frame(apply(dataset_full[, -c(which(colnames(dataset_full) == "cgf.type"),
+                                                               which(colnames(dataset_full) == "total"))], c(1,2), function(x) round(x * 100, digits = 4)))
     colnames(dataset_with_perc) <- paste(colnames(dataset_with_perc), "%")
-    
     dataset_to_display <- cbind(as.data.frame(dataset_full[, c("cgf.type", "total")]), dataset_with_perc)
     dataset_to_display <- dataset_to_display[!duplicated(dataset_to_display), ]
     dataset_to_display[(nrow(dataset_to_display) + 1), which(unlist(lapply(dataset_to_display, is.numeric)))] <-
-      round((colSums(dataset_to_display[ , which(unlist(lapply(dataset_to_display, is.numeric)))], na.rm=TRUE))/nrow(dataset_to_display))
-    dataset_to_display[nrow(dataset_to_display), "cgf.type"] = "ALL" 
-    dataset_to_display[nrow(dataset_to_display), "total"] = (dataset_to_display[nrow(dataset_to_display), "total"] * (nrow(dataset_to_display) - 1))
+      round((colSums(dataset_to_display[ , which(unlist(lapply(dataset_to_display, is.numeric)))], na.rm=TRUE))/nrow(dataset_to_display), digits = 4)
+    dataset_to_display[nrow(dataset_to_display), "cgf.type"] = "ALL"
+    dataset_to_display[nrow(dataset_to_display), ] %>% mutate()
+    dataset_to_display[nrow(dataset_to_display), "total"] <- sum(dataset_to_display[-nrow(dataset_to_display), ]$total)
+    
     DT::datatable(dataset_to_display, options = list(scrollX = TRUE))
   })
 }
